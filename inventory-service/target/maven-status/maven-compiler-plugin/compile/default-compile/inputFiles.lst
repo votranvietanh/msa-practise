@@ -1,0 +1,9 @@
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\config\RabbitConfig.java
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\entity\StockItem.java
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\event\InventoryFailedEvent.java
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\event\InventoryReservedEvent.java
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\event\PaymentSuccessEvent.java
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\InventoryServiceApplication.java
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\listener\InventoryListener.java
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\repository\InMemoryInventoryRepository.java
+J:\2. VNPT-IT\Doc\order-saga-demo\inventory-service\src\main\java\com\example\inventory\repository\InventoryRepository.java

@@ -1,0 +1,10 @@
+com\example\inventory\event\PaymentSuccessEvent$ItemDTO.class
+com\example\inventory\listener\InventoryListener.class
+com\example\inventory\InventoryServiceApplication.class
+com\example\inventory\repository\InventoryRepository.class
+com\example\inventory\entity\StockItem.class
+com\example\inventory\config\RabbitConfig.class
+com\example\inventory\event\InventoryReservedEvent.class
+com\example\inventory\repository\InMemoryInventoryRepository.class
+com\example\inventory\event\InventoryFailedEvent.class
+com\example\inventory\event\PaymentSuccessEvent.class

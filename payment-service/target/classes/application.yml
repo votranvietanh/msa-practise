@@ -1,0 +1,27 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: payment-service
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+# TTL cho key idempotency lưu trên Redis (xem InMemoryPaymentGateway).
+# Sau khoảng thời gian này, key tự hết hạn - đủ dài để chống trùng do message bị
+# redeliver (thường xảy ra trong vài giây/phút), không cần giữ mãi mãi tốn bộ nhớ Redis.
+payment:
+  idempotency-ttl: PT24H

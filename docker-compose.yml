@@ -1,0 +1,15 @@
+version: "3.8"
+
+# Hạ tầng cần thiết để chạy thật 3 service (xem README mục 8).
+# docker compose up -d
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"   # AMQP - 3 service kết nối vào đây
+      - "15672:15672" # Management UI: http://localhost:15672 (guest/guest)
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

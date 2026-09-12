@@ -1,0 +1,33 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: order-service
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  # spring.cache.type=redis: Spring dùng RedisCacheManager cho @Cacheable/@CacheEvict.
+  # File này KHÔNG được unit test đọc tới: OrderQueryServiceCacheTest tự dựng 1 Spring
+  # context tối giản riêng (dùng ConcurrentMapCacheManager) thay vì load application.yml,
+  # để test hành vi cache mà không cần Redis/RabbitMQ thật - xem comment trong file đó.
+  cache:
+    type: redis
+
+# Base URL của Payment Service để Order Service gọi REST (chỉ dùng cho đối soát/report -
+# tác vụ đọc-only, KHÔNG phải 1 phần của luồng Saga chính, luồng Saga vẫn 100% qua RabbitMQ).
+payment-service:
+  base-url: http://localhost:8082
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
