@@ -3,6 +3,12 @@
 Codebase minh họa luồng xử lý Order theo mô hình **Saga Choreography**,
 giao tiếp giữa 3 service qua **RabbitMQ (Topic Exchange)**.
 
+> **Repo này có 4 service.** 3 service `order-service`/`payment-service`/`inventory-service`
+> tạo thành 1 Saga hoàn chỉnh (nội dung README này). `catalog-service` là module RIÊNG,
+> KHÔNG tham gia Saga — bài học độc lập tập trung sâu vào **gRPC** (đủ 4 kiểu RPC) và
+> **Redis nâng cao** (Lua script atomic, Sorted Set, Pub/Sub, rate limiting). Xem
+> [catalog-service/README.md](catalog-service/README.md).
+
 > Mục đích: đọc để hiểu FLOW, tập nhận diện lỗi thường gặp khi làm hệ thống event-driven,
 > và làm ví dụ cho các kỹ năng hay xuất hiện trong JD backend (Saga, RabbitMQ, Redis,
 > SOLID, unit test, reconciliation/reporting). Code build/test được thật (xem mục 11),

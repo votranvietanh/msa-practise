@@ -1,0 +1,14 @@
+# Maven build output (mỗi service tự có thư mục target/ riêng)
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db

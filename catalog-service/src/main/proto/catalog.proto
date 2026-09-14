@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package catalog;
+
+option java_package = "com.example.catalog.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "CatalogProto";
+
+// ============================================================================
+// CatalogService - service gRPC minh hoạ ĐỦ 4 KIỂU RPC mà gRPC hỗ trợ. Đây là
+// điểm khác biệt lớn nhất so với REST (REST chỉ có đúng 1 kiểu: request/response).
+// Đọc comment ở từng rpc để biết khi nào nên chọn kiểu nào.
+// ============================================================================
+service CatalogService {
+
+  // ---- UNARY RPC: 1 request -> 1 response ----
+  // Giống hệt 1 API REST thông thường. Dùng cho phần lớn use case CRUD/tra cứu.
+  rpc CreateProduct(CreateProductRequest) returns (ProductDto);
+  rpc GetProduct(GetProductRequest) returns (ProductDto);
+  rpc CheckStock(CheckStockRequest) returns (CheckStockResponse);
+  rpc GetTopSellers(GetTopSellersRequest) returns (TopSellersResponse);
+
+  // ---- SERVER STREAMING: 1 request -> NHIỀU response, server tự đẩy dữ liệu
+  // về theo thời gian trên CÙNG 1 kết nối HTTP/2 (không phải client phải liên tục
+  // gọi lại như polling REST) ----
+  // Dùng cho: client "subscribe" 1 sản phẩm, nhận cập nhật real-time mỗi khi giá/
+  // tồn kho đổi (server bridge từ Redis Pub/Sub sang stream này - xem
+  // RedisProductWatchBridge.java).
+  rpc WatchProduct(WatchProductRequest) returns (stream ProductUpdate);
+
+  // ---- CLIENT STREAMING: NHIỀU request -> 1 response, client đẩy dữ liệu dồn
+  // dập, server gom lại rồi chỉ trả kết quả 1 lần khi client báo xong (onCompleted) ----
+  // Dùng cho: nhập kho hàng loạt (giả lập upload file CSV bằng nhiều message nhỏ,
+  // thay vì phải gói tất cả vào 1 request khổng lồ).
+  rpc BulkRestock(stream RestockItem) returns (BulkRestockSummary);
+
+  // ---- BIDIRECTIONAL STREAMING: cả 2 bên cùng gửi/nhận ĐỘC LẬP trên 1 kết nối,
+  // không cần chờ nhau theo thứ tự request/response như 2 kiểu streaming trên ----
+  // Dùng cho: phiên giữ hàng real-time - client gửi từng yêu cầu giữ hàng, server
+  // duyệt/từ chối NGAY LẬP TỨC theo tồn kho hiện tại (atomic qua Lua script Redis),
+  // client có thể tiếp tục gửi yêu cầu tiếp theo mà không cần đợi response cũ.
+  rpc ReserveStockSession(stream ReserveRequest) returns (stream ReserveResponse);
+}
+
+message CreateProductRequest {
+  string sku = 1;
+  string name = 2;
+  int64 price = 3;
+  int64 initial_stock = 4;
+}
+
+// Đặt tên "ProductDto" (không phải "Product") để tránh đụng tên với entity
+// com.example.catalog.entity.Product ở tầng lưu trữ - 2 class khác mục đích:
+// ProductDto là "hình dạng dữ liệu đi trên dây" (wire format), Product là model
+// nghiệp vụ nội bộ. Tách riêng để đổi 1 bên không bắt buộc đổi bên kia.
+message ProductDto {
+  string sku = 1;
+  string name = 2;
+  int64 price = 3;
+}
+
+message GetProductRequest {
+  string sku = 1;
+}
+
+message CheckStockRequest {
+  string sku = 1;
+}
+
+message CheckStockResponse {
+  string sku = 1;
+  int64 quantity = 2;
+}
+
+message GetTopSellersRequest {
+  int32 limit = 1;
+}
+
+message TopSellersResponse {
+  repeated TopSeller items = 1;
+}
+
+message TopSeller {
+  string sku = 1;
+  int64 sold_count = 2;
+}
+
+message WatchProductRequest {
+  string sku = 1;
+}
+
+message ProductUpdate {
+  string sku = 1;
+  UpdateType type = 2;
+  int64 new_quantity = 3;
+  string message = 4;
+
+  enum UpdateType {
+    UNKNOWN = 0;
+    RESTOCKED = 1;
+    RESERVED = 2;
+  }
+}
+
+message RestockItem {
+  string sku = 1;
+  int64 qty = 2;
+}
+
+message BulkRestockSummary {
+  int32 items_processed = 1;
+  int64 total_qty_added = 2;
+  repeated string errors = 3;
+}
+
+message ReserveRequest {
+  string request_id = 1;
+  string order_id = 2;
+  string sku = 3;
+  int64 qty = 4;
+}
+
+message ReserveResponse {
+  string request_id = 1;
+  bool approved = 2;
+  int64 remaining_stock = 3;
+  string message = 4;
+}
