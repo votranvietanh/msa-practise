@@ -72,7 +72,30 @@ là 1 service/admin-tool nội bộ khác — nơi gRPC phát huy đúng thế m
 
 ---
 
-## 4. Redis nâng cao — pattern nào dùng ở đâu
+## 4. Redis — toàn cảnh cả repo (4 service) + đi sâu ở catalog-service
+
+### 4.1. Toàn cảnh: Redis dùng ở đâu, để làm gì, trong TỪNG service
+
+Cả repo có **7 usecase Redis** trải trên 4 service, cố tình đi từ dễ (lặp lại 1 pattern ở
+nhiều nơi) tới khó (mỗi kỹ thuật xuất hiện đúng 1 lần, không trùng nhau):
+
+| # | Service | Usecase | Redis feature | File |
+|---|---|---|---|---|
+| 1 | `order-service` | Cache kết quả `GET /orders/{id}/status` — endpoint bị Frontend polling dồn dập | Cache-aside qua `@Cacheable`/`@CacheEvict` (Spring Cache, backend `RedisCacheManager`), TTL 5s | [OrderQueryService.java](../order-service/src/main/java/com/example/order/service/OrderQueryService.java) |
+| 2 | `payment-service` | Chống charge tiền 2 lần khi RabbitMQ redeliver message, kể cả khi chạy nhiều instance | Distributed lock qua `SETNX` (`opsForValue().setIfAbsent`) | [InMemoryPaymentGateway.java](../payment-service/src/main/java/com/example/payment/service/InMemoryPaymentGateway.java) |
+| 3 | `payment-service` | Chống hoàn tiền 2 lần (cùng cơ chế, khác key) | `SETNX` | (cùng file trên) |
+| 4 | `inventory-service` | Chống trừ kho 2 lần cho cùng 1 order khi message redeliver | `SETNX` | [InMemoryInventoryRepository.java](../inventory-service/src/main/java/com/example/inventory/repository/InMemoryInventoryRepository.java) |
+| 5 | `catalog-service` | Trừ kho atomic: gộp "kiểm tra đủ hàng + trừ" thành 1 bước, không hở race condition | **Lua script** (`EVAL`) | [RedisStockService.java](src/main/java/com/example/catalog/redis/RedisStockService.java) |
+| 6 | `catalog-service` | Bảng xếp hạng sản phẩm bán chạy, tự sắp xếp sẵn theo tổng số lượng bán | **Sorted Set** (`ZINCRBY`/`ZREVRANGE`) | [RedisLeaderboardService.java](src/main/java/com/example/catalog/redis/RedisLeaderboardService.java) |
+| 7 | `catalog-service` | Đẩy cập nhật giá/tồn kho real-time cho client đang `WatchProduct` (gRPC server-streaming) | **Pub/Sub** | [RedisProductEventPublisher.java](src/main/java/com/example/catalog/redis/RedisProductEventPublisher.java), [RedisProductWatchBridge.java](src/main/java/com/example/catalog/redis/RedisProductWatchBridge.java) |
+| 8 | `catalog-service` | Giới hạn số lần gọi `CreateProduct` trong 1 khoảng thời gian | **Rate limiting** (`INCR`+`EXPIRE`, fixed window) | [RedisRateLimiter.java](src/main/java/com/example/catalog/redis/RedisRateLimiter.java) |
+
+**Vì sao 2/1/3/4 dùng cùng 1 pattern (SETNX)?** Đây là điểm cố ý: idempotency (chống xử lý
+trùng khi message bị redeliver) là bài toán XUẤT HIỆN LẶP LẠI ở bất kỳ đâu có side-effect
+thật (trừ tiền, trừ kho...) trong hệ thống event-driven — học 1 lần, áp dụng nhất quán ở
+nhiều nơi, thay vì mỗi chỗ tự nghĩ ra 1 cách khác nhau.
+
+### 4.2. Đi sâu ở catalog-service — pattern nào, so với order-saga-demo
 
 | Pattern | File | So với order-saga-demo |
 |---|---|---|
