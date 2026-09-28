@@ -8,6 +8,10 @@ giao tiếp giữa 3 service qua **RabbitMQ (Topic Exchange)**.
 > KHÔNG tham gia Saga — bài học độc lập tập trung sâu vào **gRPC** (đủ 4 kiểu RPC) và
 > **Redis nâng cao** (Lua script atomic, Sorted Set, Pub/Sub, rate limiting). Xem
 > [catalog-service/README.md](catalog-service/README.md).
+>
+> `rest-vs-grpc-demo` cũng là module riêng: đặt REST và gRPC cạnh nhau cho CÙNG 1 case
+> (Order hỏi giá + tồn kho từ Catalog) để thấy rõ khác biệt - xem
+> [rest-vs-grpc-demo/README.md](rest-vs-grpc-demo/README.md).
 
 > Mục đích: đọc để hiểu FLOW, tập nhận diện lỗi thường gặp khi làm hệ thống event-driven,
 > và làm ví dụ cho các kỹ năng hay xuất hiện trong JD backend (Saga, RabbitMQ, Redis,

@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+// "v1" trong tên package: quy ước phổ biến để version API gRPC - tương đương /api/v1/
+// trong URL của REST. Khi cần thay đổi phá vỡ tương thích thì tạo package v2 mới.
+package productquery.v1;
+
+option java_package = "com.example.compare.grpc";
+option java_multiple_files = true;
+
+// ============================================================================
+// ĐÂY LÀ "HỢP ĐỒNG" DUY NHẤT giữa Order Service (client) và Catalog Service (server).
+// Cả 2 phía đều sinh code từ CHÍNH file này -> không thể lệch tên field/kiểu dữ liệu.
+//
+// Phía REST không có thứ tương đương BẮT BUỘC: hợp đồng nằm "trong đầu" dev hoặc trong
+// Swagger, còn DTO thì mỗi phía tự viết tay 1 bản (xem ProductResponse ở phía server và
+// RestCatalogClient.ProductJson ở phía client - 2 class độc lập, dễ lệch nhau).
+// ============================================================================
+service ProductQueryService {
+  // Tương đương REST: GET /api/v1/products?skus=A,B,C
+  rpc GetProducts(GetProductsRequest) returns (GetProductsResponse);
+}
+
+message GetProductsRequest {
+  repeated string skus = 1;   // "repeated" = List<String>
+}
+
+message GetProductsResponse {
+  repeated Product products = 1;
+}
+
+message Product {
+  // Các số 1,2,3,4 là "field number" - thứ THỰC SỰ được gửi đi trên dây thay cho tên
+  // field. Đổi tên "price" thành "unit_price" vẫn tương thích với client cũ miễn là GIỮ
+  // NGUYÊN số 3. Ngược lại với JSON: đổi tên key là client cũ nhận null/0 ngay.
+  string sku = 1;
+  string name = 2;
+  int64 price = 3;   // đơn vị: VND
+  int32 stock = 4;
+}

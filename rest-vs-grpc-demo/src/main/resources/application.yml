@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: rest-vs-grpc-demo
+
+# Phía Catalog (server): REST dùng port của Tomcat, gRPC mở port riêng.
+server:
+  port: 8090
+grpc:
+  server:
+    port: 9095
+
+# Phía Order (client): trỏ sang Catalog. Cùng 1 timeout cho cả 2 giao thức để so sánh công bằng.
+catalog-client:
+  rest-base-url: http://localhost:8090
+  grpc-host: localhost
+  grpc-port: 9095
+  timeout: 1s
