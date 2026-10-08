@@ -5,6 +5,7 @@ com\example\payment\event\PaymentFailedEvent.class
 com\example\payment\event\PaymentSuccessEvent.class
 com\example\payment\listener\PaymentListener$1.class
 com\example\payment\listener\PaymentListener.class
+com\example\payment\config\SecurityConfig.class
 com\example\payment\service\ChargeResult.class
 com\example\payment\ledger\TransactionType.class
 com\example\payment\event\RefundRequestEvent.class

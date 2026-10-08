@@ -1,8 +1,12 @@
+J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\client\AuthServiceTokenProvider.java
 J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\client\PaymentLedgerClient.java
 J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\client\RestPaymentLedgerClient.java
+J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\client\ServiceAuthInterceptor.java
+J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\client\ServiceTokenProvider.java
 J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\config\CacheConfig.java
 J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\config\RabbitConfig.java
 J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\config\RestClientConfig.java
+J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\config\SecurityConfig.java
 J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\controller\OrderController.java
 J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\controller\ReconciliationController.java
 J:\2. VNPT-IT\Doc\order-saga-demo\order-service\src\main\java\com\example\order\controller\ReportController.java

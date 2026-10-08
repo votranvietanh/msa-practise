@@ -1,4 +1,5 @@
 J:\2. VNPT-IT\Doc\order-saga-demo\payment-service\src\main\java\com\example\payment\config\RabbitConfig.java
+J:\2. VNPT-IT\Doc\order-saga-demo\payment-service\src\main\java\com\example\payment\config\SecurityConfig.java
 J:\2. VNPT-IT\Doc\order-saga-demo\payment-service\src\main\java\com\example\payment\controller\PaymentLedgerController.java
 J:\2. VNPT-IT\Doc\order-saga-demo\payment-service\src\main\java\com\example\payment\event\OrderCreatedEvent.java
 J:\2. VNPT-IT\Doc\order-saga-demo\payment-service\src\main\java\com\example\payment\event\PaymentFailedEvent.java
