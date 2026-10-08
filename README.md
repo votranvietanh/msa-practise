@@ -12,6 +12,10 @@ giao tiếp giữa 3 service qua **RabbitMQ (Topic Exchange)**.
 > `rest-vs-grpc-demo` cũng là module riêng: đặt REST và gRPC cạnh nhau cho CÙNG 1 case
 > (Order hỏi giá + tồn kho từ Catalog) để thấy rõ khác biệt - xem
 > [rest-vs-grpc-demo/README.md](rest-vs-grpc-demo/README.md).
+>
+> `auth-service` là nơi PHÁT JWT (đăng nhập người dùng + OAuth2 client credentials cho service).
+> `order-service`, `payment-service`, `catalog-service` đều bắt buộc có token hợp lệ - xem
+> [mục 13](#13-xác-thực--phân-quyền-jwt). (`rest-vs-grpc-demo` vẫn KHÔNG có xác thực.)
 
 > Mục đích: đọc để hiểu FLOW, tập nhận diện lỗi thường gặp khi làm hệ thống event-driven,
 > và làm ví dụ cho các kỹ năng hay xuất hiện trong JD backend (Saga, RabbitMQ, Redis,
@@ -330,14 +334,17 @@ vi bộ test hiện tại.
 
 ## 10. API Endpoints & OpenAPI
 
-| Method | Endpoint | Service | Mục đích |
-|---|---|---|---|
-| POST | `/orders` | order-service | Tạo order, khởi động Saga |
-| GET | `/orders/{id}/status` | order-service | Frontend polling (có cache Redis) |
-| GET | `/orders/report/summary` | order-service | Báo cáo tổng hợp |
-| GET | `/orders/reconciliation` | order-service | Đối soát với Payment Service |
-| GET | `/payments/ledger` | payment-service | Toàn bộ sổ cái giao dịch |
-| GET | `/payments/ledger/{orderId}` | payment-service | Sổ cái của 1 order |
+| Method | Endpoint | Service | Mục đích | Yêu cầu (JWT) |
+|---|---|---|---|---|
+| POST | `/auth/login` | auth-service | Người dùng đăng nhập, nhận JWT | (công khai) |
+| POST | `/oauth2/token` | auth-service | Service xin token (client credentials) | client_id + client_secret |
+| GET | `/oauth2/jwks` | auth-service | Khoá công khai để verify chữ ký | (công khai) |
+| POST | `/orders` | order-service | Tạo order, khởi động Saga | role `USER` |
+| GET | `/orders/{id}/status` | order-service | Frontend polling (có cache Redis) | role `USER` (chỉ đơn CỦA MÌNH) hoặc `ADMIN` |
+| GET | `/orders/report/summary` | order-service | Báo cáo tổng hợp | role `ADMIN` |
+| GET | `/orders/reconciliation` | order-service | Đối soát với Payment Service | role `ADMIN` |
+| GET | `/payments/ledger` | payment-service | Toàn bộ sổ cái giao dịch | service token scope `ledger:read` |
+| GET | `/payments/ledger/{orderId}` | payment-service | Sổ cái của 1 order | service token scope `ledger:read` |
 
 order-service và payment-service tích hợp sẵn `springdoc-openapi` — sau khi chạy (mục 11), xem tài liệu
 API tương tác tại `http://localhost:8081/swagger-ui.html` và `http://localhost:8082/swagger-ui.html`.
@@ -347,30 +354,39 @@ API tương tác tại `http://localhost:8081/swagger-ui.html` và `http://local
 ## 11. Chạy thử thật
 
 Khác với bản demo lúc đầu (chỉ đọc code, không build được), repo giờ có `pom.xml` + `application.yml`
-đầy đủ cho cả 3 service — build/chạy được thật.
+đầy đủ cho cả các service — build/chạy được thật.
 
 ```bash
 # 1. Hạ tầng: RabbitMQ + Redis
 docker compose up -d
 
-# 2. Chạy từng service (3 terminal riêng, hoặc 3 process nền)
+# 2. Chạy từng service (mỗi cái 1 terminal, hoặc process nền). auth-service chạy TRƯỚC.
+cd auth-service       && mvn spring-boot:run   # port 8090 - phát JWT
 cd order-service      && mvn spring-boot:run   # port 8081
 cd payment-service    && mvn spring-boot:run   # port 8082
-cd inventory-service  && mvn spring-boot:run   # port 8083
+cd inventory-service  && mvn spring-boot:run   # port 8083 (chỉ nhận message, chưa có REST nên chưa cần token)
 
-# 3. Thử happy path
-curl -X POST http://localhost:8081/orders \
+# 3. Đăng nhập (tài khoản demo alice/bob/admin: xem auth-service/src/main/resources/application.yml)
+TOKEN=$(curl -s -X POST http://localhost:8090/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"userId":"U001","amount":250000,"items":[{"sku":"ITEM-01","qty":2}]}'
+  -d '{"username":"alice","password":"alice-pass"}' | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
 
-# 4. Poll status bằng orderId trả về ở bước 3
-curl http://localhost:8081/orders/ORD-XXXXXXXX/status
+# 4. Thử happy path - KHÔNG gửi userId trong body, server lấy từ token (alice = U001)
+curl -X POST http://localhost:8081/orders \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"amount":250000,"items":[{"sku":"ITEM-01","qty":2}]}'
+
+# 5. Poll status bằng orderId trả về ở bước 4 (chỉ xem được đơn của chính mình)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/orders/ORD-XXXXXXXX/status
 ```
 
 Gợi ý test nhanh các nhánh khác nhau (xem `PaymentGateway`/`InventoryRepository` để biết dữ liệu giả lập):
-- `userId=U002, amount=250000` → `payment.failed` (U002 chỉ có 100.000 trong ví) → order `FAILED`.
+- Đăng nhập bằng `bob` (userId `U002`) và đặt đơn `amount=250000` → `payment.failed` (U002 chỉ có 100.000 trong ví) → order `FAILED`.
 - `items=[{"sku":"ITEM-02","qty":1}]` → `inventory.failed` (ITEM-02 hết hàng sẵn) → order `FAILED` +
-  tự động compensate hoàn tiền → kiểm tra `GET /payments/ledger` sẽ thấy đủ cặp `CHARGE_SUCCESS`+`REFUND`.
+  tự động compensate hoàn tiền → kiểm tra sổ cái sẽ thấy đủ cặp `CHARGE_SUCCESS`+`REFUND`. `GET /payments/ledger`
+  cần SERVICE token (không phải token người dùng): xin bằng
+  `curl -X POST localhost:8090/oauth2/token -d "grant_type=client_credentials&client_id=order-service&client_secret=order-service-secret&scope=ledger:read"`
+  hoặc đơn giản gọi `GET /orders/reconciliation` bằng token `admin` - order-service tự xin token để hỏi payment-service.
 
 Mục tiêu chính của bộ code này vẫn là **đọc để hiểu flow và học cách soi lỗi trong hệ thống event-driven**
 — phần build/test thật chỉ để chứng minh những gì đọc được là đúng, không phải để deploy production.
@@ -384,7 +400,8 @@ Mục tiêu chính của bộ code này vẫn là **đọc để hiểu flow và
 | Redis: caching | `OrderQueryService` (mục 7.1) |
 | Redis: idempotency phân tán | `InMemoryPaymentGateway`, `InMemoryInventoryRepository` (mục 7.2) |
 | Clean code, design pattern | Saga Choreography, Repository/Gateway pattern, ACL (mục 4); tách interface khỏi implementation (mục 6) |
-| Well-tested | JUnit 5 + Mockito + AssertJ, 36 test qua 3 service (mục 9) |
+| Well-tested | JUnit 5 + Mockito + AssertJ, 121 test qua 5 service (mục 9, 13) |
+| Authentication/Authorization | JWT RS256 + OAuth2 client credentials + phân quyền theo role/scope/dữ liệu (mục 13) |
 | Payment processing | `PaymentGateway`/`PaymentListener`/`RefundListener` |
 | Reconciliation | `ReconciliationService` (mục 8.2) |
 | Reporting | `ReportService`, `PaymentLedger` (mục 8.1, 8.3) |
@@ -392,6 +409,90 @@ Mục tiêu chính của bộ code này vẫn là **đọc để hiểu flow và
 | SOLID | Mục 6 — S/D thể hiện rõ, O cố tình để lộ 1 trade-off chưa tối ưu để bàn luận |
 
 **Giới hạn còn lại nếu dùng repo này làm bằng chứng phỏng vấn** (nói thẳng để không quá lời): dữ liệu vẫn
-toàn bộ in-memory (mất khi restart, không dùng được khi scale ngang thật), chưa có Spring Security/auth,
-chưa có integration test với Redis/RabbitMQ thật (Testcontainers), chưa có CI pipeline. Đây vẫn là 1 bộ
-demo học tập, không phải production-ready service.
+toàn bộ in-memory (mất khi restart, không dùng được khi scale ngang thật), chưa có TLS và chưa bảo vệ
+RabbitMQ/Redis bằng tài khoản riêng (xem mục 13.5 - danh sách đầy đủ), chưa có integration test với
+Redis/RabbitMQ thật (Testcontainers), chưa có CI pipeline. Đây vẫn là 1 bộ demo học tập, không phải
+production-ready service.
+
+---
+
+## 13. Xác thực & phân quyền (JWT)
+
+Trước đây các service không xác thực nhau (và không xác thực cả người dùng): ai chạm được cổng là gọi
+được. Giờ có `auth-service` phát token và 3 service (order, payment, catalog) bắt buộc phải có token hợp lệ.
+
+### 13.1. Mô hình
+
+```
+ Người dùng ──login(username,password)──▶ auth-service ──JWT (sub=U001, roles=[USER])──▶ người dùng
+ Người dùng ──Bearer JWT──▶ order-service   (kiểm tra chữ ký bằng KHOÁ CÔNG KHAI lấy từ auth-service/oauth2/jwks)
+
+ order-service ──client_id+secret──▶ auth-service ──JWT (sub=order-service, scope=ledger:read)──▶ order-service
+ order-service ──Bearer service JWT──▶ payment-service  (GET /payments/ledger, cần scope ledger:read)
+
+ Client gRPC ──client_id+secret──▶ auth-service ──JWT (scope=catalog:read catalog:write...)──▶ client
+ Client gRPC ──metadata "authorization: Bearer ..."──▶ catalog-service (JwtAuthInterceptor)
+```
+
+- **RS256 (bất đối xứng)**: chỉ auth-service giữ khoá RIÊNG để ký. Các service khác chỉ có khoá CÔNG KHAI
+  để kiểm tra - kiểm tra được nhưng KHÔNG tự phát hành được token giả (khác HS256 dùng chung 1 secret:
+  service nào biết secret cũng giả mạo được token của người khác).
+- **2 loại token**: token người dùng (`sub` = userId, claim `roles`) và token service (`sub` = tên service,
+  claim `scope`). Token service ngắn hạn hơn (5 phút so với 15 phút) và mỗi service chỉ xin được đúng scope
+  nó được cấp (đặc quyền tối thiểu).
+
+### 13.2. Ai được làm gì
+
+| Kênh | Cơ chế | Điều kiện |
+|---|---|---|
+| `POST /orders` | Spring Security resource server | role `USER`; `userId` lấy từ token, **không** còn nhận từ body |
+| `GET /orders/{id}/status` | như trên + kiểm tra chủ đơn | chủ đơn hoặc `ADMIN`; đơn của người khác trả **404** (không lộ đơn có tồn tại) |
+| `/orders/report/**`, `/orders/reconciliation` | như trên | role `ADMIN` |
+| `/payments/ledger/**` | resource server | service token có scope `ledger:read` (token người dùng, kể cả admin, bị 403) |
+| gRPC `catalog-service` | `JwtAuthInterceptor` | mỗi RPC cần 1 scope: `catalog:read` / `catalog:write` / `catalog:reserve`; thiếu header -> `UNAUTHENTICATED`, thiếu scope -> `PERMISSION_DENIED` |
+| Mọi đường dẫn khác | `denyAll` | chặn mặc định - thêm endpoint mới mà quên khai báo quyền thì bị chặn, không bị mở toang |
+
+Rate limit của gRPC giờ tính **theo từng người gọi** (key = method + `sub` của token), không còn dùng chung
+1 hạn mức cho cả hệ thống.
+
+### 13.3. Chạy thử nhanh
+
+```bash
+mvn -q -DskipTests package   # trong từng thư mục service, rồi: java -jar target/<service>-1.0.0.jar
+curl -s -o /dev/null -w "%{http_code}\n" localhost:8081/orders/x/status          # 401: không token
+curl -s -X POST localhost:8090/auth/login -H "Content-Type: application/json" \
+     -d '{"username":"alice","password":"alice-pass"}'                           # nhận access_token
+# gRPC: chạy CatalogClientDemo (catalog-service/README.md) - mục "0) XÁC THỰC" in ra UNAUTHENTICATED /
+# PERMISSION_DENIED / NOT_FOUND (NOT_FOUND nghĩa là đã QUA cổng xác thực, tới được logic nghiệp vụ)
+```
+
+### 13.4. Lỗi tìm ra nhờ CHẠY THẬT (unit test không bắt được)
+
+1. **`catalog-service` khởi động xong rồi tự thoát.** Thread của gRPC server là daemon, app lại không có
+   web server nào giữ JVM sống - `main()` chạy xong là JVM tắt. Bản trước còn viết comment khẳng định
+   ngược lại mà chưa từng chạy thử. Sửa: 1 thread không-daemon chờ `server.awaitTermination()`
+   (`GrpcServerLifecycle.keepJvmAlive`).
+2. **Comment về thứ tự interceptor bị SAI.** `ServerInterceptors.intercept(svc, a, b, c)` chạy `c` TRƯỚC,
+   còn `interceptForward(svc, a, b, c)` mới chạy `a` trước. Đây không phải chuyện thẩm mỹ: rate limit
+   muốn tính theo người gọi thì xác thực phải chạy trước nó. Giờ dùng `interceptForward` và có
+   `InterceptorOrderTest` khoá cứng cả thư viện lẫn wiring thật.
+3. **`denyAll` che mất lỗi 500 thành 403.** Khi controller ném lỗi (ở đây: Redis không chạy), Spring
+   chuyển sang `/error`, mà `/error` cũng bị chặn -> client thấy "cấm truy cập" thay vì lỗi server thật.
+   Sửa: cho phép riêng `/error`. Unit test bằng MockMvc không có bước chuyển tiếp này nên không bắt được.
+
+### 13.5. Chưa làm — nói thẳng để không ngộ nhận là "đủ an toàn cho production"
+
+- **Chưa có TLS ở bất kỳ kênh nào.** JWT đi trên mạng dạng chữ thường: ai nghe lén được là lấy được token
+  và dùng lại tới khi hết hạn. Xác thực bằng token chỉ có ý nghĩa thật khi đi kèm TLS/mTLS.
+- **RabbitMQ vẫn `guest/guest`, Redis không mật khẩu, dùng chung cho mọi service.** Luồng Saga qua RabbitMQ
+  KHÔNG được bảo vệ bởi JWT (không phải HTTP): ai có tài khoản broker vẫn publish được `payment.success` giả.
+- **`amount` do client gửi lên** (`POST /orders`) - server tin giá do khách tự khai. Hệ thống thật phải tự
+  tính tổng tiền từ giá sản phẩm phía server.
+- Swagger UI và gRPC Reflection đang mở (tiện học, production nên tắt/giới hạn). `rest-vs-grpc-demo` và
+  `inventory-service` (chỉ có message, chưa có REST) chưa được đụng tới.
+- `/auth/login` chưa chống dò mật khẩu (khoá tạm sau N lần sai, rate limit), chưa có refresh token, thu hồi
+  token, xoay khoá có kế hoạch, hay kiểm tra `aud` (token cấp cho service A vẫn đưa được cho service B nếu
+  đủ scope). Khoá ký sinh mới mỗi lần auth-service khởi động nên restart là mọi token cũ mất hiệu lực.
+- Tài khoản/secret demo nằm thẳng trong `application.yml`; production dùng DB (chỉ lưu hash) + vault.
+- Luồng đặt đơn thật và kiểm tra "chủ đơn" mới được chứng minh bằng unit test (`OrderSecurityTest`), chưa
+  chạy end-to-end thật vì cần RabbitMQ + Redis (môi trường phát triển hiện tại không có Docker).

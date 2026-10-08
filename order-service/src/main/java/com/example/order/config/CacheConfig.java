@@ -2,6 +2,7 @@ package com.example.order.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.cache.RedisCacheManagerBuilderCustomizer;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -13,8 +14,13 @@ import java.time.Duration;
 /**
  * Tuỳ biến RedisCacheManager mà Spring Boot tự tạo (do có spring-boot-starter-data-redis
  * trên classpath + spring.cache.type=redis trong application.yml).
+ *
+ * @EnableCaching: bật cơ chế cache abstraction của Spring (@Cacheable/@CacheEvict) - thiếu
+ * annotation này, các annotation cache bị Spring bỏ qua hoàn toàn (không lỗi, chỉ đơn giản
+ * là không cache gì cả).
  */
 @Configuration
+@EnableCaching
 public class CacheConfig {
 
     /**

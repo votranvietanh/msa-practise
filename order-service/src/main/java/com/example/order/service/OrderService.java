@@ -27,16 +27,16 @@ public class OrderService {
      *  2. Publish event "order.created" cho Payment Service xử lý tiếp
      *  3. Trả về orderId NGAY, không chờ Payment/Inventory xử lý xong (async)
      */
-    public Order createOrder(CreateOrderRequest req) {
+    public Order createOrder(String userId, CreateOrderRequest req) {
         // UUID.randomUUID(): sinh 1 chuỗi ngẫu nhiên gần như chắc chắn không trùng (128-bit).
         // .substring(0, 8): chỉ lấy 8 ký tự đầu cho orderId gọn, dễ đọc trong log khi demo
         // (project thật thường dùng ID tăng dần từ DB hoặc UUID đầy đủ để đảm bảo unique tuyệt đối).
         String orderId = "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
-        Order order = new Order(orderId, req.getUserId(), req.getAmount(), req.getItems(), OrderStatus.PENDING);
+        Order order = new Order(orderId, userId, req.getAmount(), req.getItems(), OrderStatus.PENDING);
         orderRepository.save(order);
 
-        OrderCreatedEvent event = new OrderCreatedEvent(orderId, req.getUserId(), req.getAmount(), req.getItems());
+        OrderCreatedEvent event = new OrderCreatedEvent(orderId, userId, req.getAmount(), req.getItems());
         publisher.publishOrderCreated(event);
 
         return order;

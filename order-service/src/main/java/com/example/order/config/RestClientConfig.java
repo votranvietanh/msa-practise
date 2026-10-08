@@ -1,5 +1,7 @@
 package com.example.order.config;
 
+import com.example.order.client.ServiceAuthInterceptor;
+import com.example.order.client.ServiceTokenProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,9 +19,16 @@ public class RestClientConfig {
      * nghiệp vụ giữa các service trong luồng Saga chính. Luồng Saga (order.created,
      * payment.success...) vẫn phải 100% qua RabbitMQ để giữ đúng nguyên tắc: xử lý bất
      * đồng bộ, không phụ thuộc Payment Service phải đang online tại đúng thời điểm gọi.
+     *
+     * requestInterceptor(ServiceAuthInterceptor): mọi request qua client này tự mang theo
+     * service token (xem ServiceAuthInterceptor) - payment-service từ chối request không có.
      */
     @Bean
-    public RestClient paymentServiceRestClient(@Value("${payment-service.base-url}") String baseUrl) {
-        return RestClient.builder().baseUrl(baseUrl).build();
+    public RestClient paymentServiceRestClient(@Value("${payment-service.base-url}") String baseUrl,
+                                                ServiceTokenProvider tokenProvider) {
+        return RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestInterceptor(new ServiceAuthInterceptor(tokenProvider))
+                .build();
     }
 }

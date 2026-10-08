@@ -45,6 +45,14 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- Chỉ lấy phần KIỂM TRA JWT của Spring Security (NimbusJwtDecoder) - service này không
+             có web server nên không dùng starter oauth2-resource-server (đó là cho Servlet filter).
+             Việc "gắn" decoder vào request do JwtAuthInterceptor (gRPC) tự làm. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+
         <!-- grpc-netty-shaded: server/transport HTTP2 - bản "shaded" đóng gói sẵn Netty
              riêng, tránh xung đột version Netty với các thư viện khác trong classpath. -->
         <dependency>

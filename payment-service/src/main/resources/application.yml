@@ -16,6 +16,15 @@ spring:
       host: localhost
       port: 6379
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Khoá công khai của auth-service để verify chữ ký (tải lười ở request đầu tiên).
+          jwk-set-uri: http://localhost:8090/oauth2/jwks
+          # Chỉ nhận token do đúng issuer này phát hành.
+          issuer-uri: http://localhost:8090
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

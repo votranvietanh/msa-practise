@@ -49,6 +49,21 @@ public class OrderQueryService {
     }
 
     /**
+     * Ai là chủ của đơn này - để OrderController chặn người dùng xem đơn của người khác
+     * (lỗi IDOR: chỉ cần đoán/đổi orderId trên URL là đọc được dữ liệu người khác nếu server
+     * chỉ kiểm tra "đã đăng nhập" mà quên kiểm tra "có phải đơn của mình không").
+     *
+     * Cache riêng vì chủ đơn KHÔNG BAO GIỜ đổi sau khi tạo - không cần evict, và mỗi lần
+     * polling status đều phải kiểm tra quyền nên đây cũng là lời gọi nóng không kém getStatus.
+     */
+    @Cacheable(value = "orderOwner", key = "#orderId", unless = "#result == null")
+    public String getOwnerId(String orderId) {
+        return orderRepository.findById(orderId)
+                .map(order -> order.getUserId())
+                .orElse(null);
+    }
+
+    /**
      * Method này KHÔNG có logic bên trong - bản thân annotation @CacheEvict mới là thứ
      * thực sự xoá key khỏi Redis. Gọi method rỗng này là cách chuẩn để "nhờ" Spring AOP
      * proxy chặn lại và chạy hành vi evict, giống hệt cách @Cacheable chặn lại getStatus().

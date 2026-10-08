@@ -34,11 +34,11 @@ class OrderServiceTest {
     @Test
     void createOrder_luuOrderVoiStatusPending_vaPublishOrderCreated() {
         CreateOrderRequest request = new CreateOrderRequest();
-        request.setUserId("U001");
         request.setAmount(250_000L);
         request.setItems(List.of());
 
-        Order order = orderService.createOrder(request);
+        // userId đến từ JWT (controller truyền xuống), không còn nằm trong body request
+        Order order = orderService.createOrder("U001", request);
 
         assertThat(order.getId()).startsWith("ORD-");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);

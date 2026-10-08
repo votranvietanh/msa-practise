@@ -47,9 +47,13 @@ là 1 service/admin-tool nội bộ khác — nơi gRPC phát huy đúng thế m
    cầu nối sang server-streaming gRPC.
 7. `redis/RedisRateLimiter.java` + `grpc/RateLimitInterceptor.java` — rate limiting + cách
    gắn nó vào toàn bộ service qua interceptor (không sửa từng method).
-8. `grpc/GrpcServerLifecycle.java` — cách 1 gRPC server thật sự được khởi động (không dùng
-   thư viện tích hợp sẵn, xem trực tiếp `ServerBuilder`).
-9. `client/CatalogClientDemo.java` — góc nhìn NGƯỢC LẠI: cách 1 client gọi cả 4 kiểu RPC.
+8. `grpc/JwtAuthInterceptor.java` + `grpc/CallerContext.java` — XÁC THỰC + PHÂN QUYỀN cho gRPC: đọc
+   JWT từ metadata `authorization`, mỗi RPC cần 1 scope (`catalog:read|write|reserve`), ghi người gọi
+   vào `io.grpc.Context`. Tương đương Spring Security bên REST (xem README gốc, mục 13).
+9. `grpc/GrpcServerLifecycle.java` — cách 1 gRPC server thật sự được khởi động (không dùng
+   thư viện tích hợp sẵn, xem trực tiếp `ServerBuilder`), cách xếp thứ tự interceptor (có bẫy!) và
+   vì sao phải có thread giữ JVM sống.
+10. `client/CatalogClientDemo.java` — góc nhìn NGƯỢC LẠI: cách 1 client tự xin token rồi gọi cả 4 kiểu RPC.
 
 ---
 
@@ -122,8 +126,14 @@ hoàn toàn trong 1 JVM, không mở cổng TCP thật, nhanh và không xung đ
 `RedisLeaderboardServiceTest`, `RedisRateLimiterTest` mock `StringRedisTemplate` (không cần
 Redis thật). `RateLimitInterceptorTest` verify interceptor qua chính 1 in-process server.
 
+Phần bảo mật: `JwtAuthInterceptorTest` đi qua in-process server với JWT thật (ký bằng khoá sinh trong
+test, xem `TestTokens`) và phủ các trường hợp: thiếu header, sai scheme, token rác/hết hạn/ký bằng khoá
+lạ/sai issuer -> `UNAUTHENTICATED`; thiếu scope -> `PERMISSION_DENIED`; lỗi hạ tầng khi tải khoá ->
+`UNAVAILABLE` (không báo nhầm là token sai). Có test canh việc mọi RPC trong `.proto` đều đã khai báo scope.
+`InterceptorOrderTest` khoá cứng thứ tự interceptor (xem bẫy `intercept` vs `interceptForward`).
+
 ```bash
-mvn test   # 25 test, không cần Redis/gRPC thật chạy nền
+mvn test   # 42 test, không cần Redis/gRPC/auth-service thật chạy nền
 ```
 
 ---
@@ -136,16 +146,28 @@ cd ..
 docker compose up -d
 cd catalog-service
 
-# 2. Chạy server
-mvn spring-boot:run    # gRPC lắng nghe port 9090
+# 2. auth-service (phát token) rồi catalog-service - mỗi cái 1 terminal
+cd ../auth-service && mvn spring-boot:run     # port 8090
+cd ../catalog-service && mvn spring-boot:run  # gRPC lắng nghe port 9090
 
 # 3. (terminal khác) Liệt kê API bằng grpcurl - không cần file .proto nhờ Server Reflection
+#    (reflection KHÔNG cần token, nhưng GỌI API thì phải có)
 grpcurl -plaintext localhost:9090 list
-grpcurl -plaintext localhost:9090 catalog.CatalogService/GetTopSellers
 
-# 4. Hoặc chạy client demo có sẵn (gọi đủ cả 4 kiểu RPC, in kết quả ra console)
+# 4. Xin token rồi gọi API (không token -> UNAUTHENTICATED)
+TOKEN=$(curl -s -X POST localhost:8090/oauth2/token \
+  -d "grant_type=client_credentials&client_id=catalog-demo-client&client_secret=catalog-demo-secret" \
+  | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
+grpcurl -plaintext -H "authorization: Bearer $TOKEN" localhost:9090 catalog.CatalogService/GetTopSellers
+
+# 5. Hoặc chạy client demo có sẵn: tự xin token, in 3 kết quả xác thực khác nhau rồi gọi đủ cả 4 kiểu RPC
 mvn exec:java -Dexec.mainClass=com.example.catalog.client.CatalogClientDemo
 ```
 
 Thử rate limiting: gọi `CreateProduct` liên tục hơn 5 lần trong 10 giây (vd chạy
-`CatalogClientDemo` vài lần liên tiếp) sẽ thấy lỗi `RESOURCE_EXHAUSTED` từ interceptor.
+`CatalogClientDemo` vài lần liên tiếp) sẽ thấy lỗi `RESOURCE_EXHAUSTED` từ interceptor - hạn mức tính
+RIÊNG cho từng client (`sub` của token), nên client khác không bị chặn lây.
+
+Client demo dùng secret mặc định của dữ liệu mồi trong `auth-service/application.yml`; đổi bằng biến môi
+trường `CATALOG_CLIENT_SECRET`, `CATALOG_READONLY_SECRET`, `AUTH_URL`. Lưu ý: chưa bật TLS nên token vẫn
+đi dạng chữ thường trên mạng (xem README gốc, mục 13.5).

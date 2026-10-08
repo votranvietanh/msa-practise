@@ -23,10 +23,29 @@ spring:
   cache:
     type: redis
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Lấy khoá CÔNG KHAI của auth-service để verify chữ ký (tải lười: lần đầu có request
+          # mới tải, nên order-service khởi động được dù auth-service chưa chạy).
+          jwk-set-uri: http://localhost:8090/oauth2/jwks
+          # Chỉ chấp nhận token do ĐÚNG issuer này phát hành (claim "iss").
+          issuer-uri: http://localhost:8090
+
 # Base URL của Payment Service để Order Service gọi REST (chỉ dùng cho đối soát/report -
 # tác vụ đọc-only, KHÔNG phải 1 phần của luồng Saga chính, luồng Saga vẫn 100% qua RabbitMQ).
 payment-service:
   base-url: http://localhost:8082
+
+# "Tài khoản" của order-service khi nó đóng vai CLIENT gọi payment-service.
+# client-secret đọc từ biến môi trường ORDER_SERVICE_CLIENT_SECRET (giá trị sau dấu ":" chỉ là
+# mặc định cho chạy local) - production KHÔNG bao giờ để secret trong file cấu hình commit lên git.
+auth-service:
+  base-url: http://localhost:8090
+  client-id: order-service
+  client-secret: ${ORDER_SERVICE_CLIENT_SECRET:order-service-secret}
+  scope: ledger:read
 
 springdoc:
   swagger-ui:

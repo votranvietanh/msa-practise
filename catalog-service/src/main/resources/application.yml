@@ -13,3 +13,8 @@ spring:
 grpc:
   server:
     port: 9090
+
+# Cách kiểm tra JWT do auth-service phát (xem JwtDecoderConfig, JwtAuthInterceptor).
+auth:
+  issuer: http://localhost:8090
+  jwk-set-uri: http://localhost:8090/oauth2/jwks

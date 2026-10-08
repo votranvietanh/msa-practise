@@ -1,0 +1,48 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: auth-service
+  autoconfigure:
+    # Mặc định Spring Boot tạo sẵn 1 user "user" với mật khẩu ngẫu nhiên in ra log - ở đây
+    # tự quản lý tài khoản qua TokenService nên tắt đi cho khỏi gây hiểu nhầm.
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+# ============================================================================
+# DỮ LIỆU DEMO - KHÔNG BAO GIỜ làm vậy ở production.
+# Production: user/client nằm trong DB (chỉ lưu hash BCrypt), secret lấy từ vault/
+# biến môi trường, và thường dùng sản phẩm có sẵn (Keycloak, Spring Authorization
+# Server, Auth0...) thay vì tự viết auth-service như bài học này.
+# ============================================================================
+auth:
+  issuer: http://localhost:8090
+  user-token-ttl: PT15M      # token người dùng sống lâu hơn cho tiện thao tác
+  service-token-ttl: PT5M    # token service ngắn hơn: bị lộ thì thiệt hại có hạn
+
+  users:
+    - username: alice
+      password: alice-pass
+      user-id: U001
+      roles: [USER]
+    - username: bob
+      password: bob-pass
+      user-id: U002
+      roles: [USER]
+    - username: admin
+      password: admin-pass
+      user-id: ADMIN-01
+      roles: [ADMIN]
+
+  # "Tài khoản" của SERVICE (không phải người): mỗi service 1 client riêng, chỉ được xin
+  # đúng những scope nó thật sự cần (nguyên tắc đặc quyền tối thiểu).
+  clients:
+    - client-id: order-service
+      client-secret: order-service-secret
+      scopes: [ledger:read]
+    - client-id: catalog-demo-client
+      client-secret: catalog-demo-secret
+      scopes: [catalog:read, catalog:write, catalog:reserve]
+    - client-id: catalog-readonly-client
+      client-secret: catalog-readonly-secret
+      scopes: [catalog:read]

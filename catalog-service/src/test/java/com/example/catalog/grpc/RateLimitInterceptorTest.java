@@ -78,6 +78,15 @@ class RateLimitInterceptorTest {
     }
 
     @Test
+    void chuaXacThuc_thiHanMucTinhChungChoNhomAnonymous() {
+        when(rateLimiter.tryAcquire(anyString(), anyInt(), any())).thenReturn(true);
+
+        stub.createProduct(CreateProductRequest.newBuilder().setSku("SKU-A").build());
+
+        verify(rateLimiter).tryAcquire(eq("catalog.CatalogService/CreateProduct:anonymous"), eq(5), any());
+    }
+
+    @Test
     void chanRequest_traVeResourceExhausted_khiRateLimiterTuChoi() {
         when(rateLimiter.tryAcquire(anyString(), eq(5), eq(Duration.ofSeconds(10)))).thenReturn(false);
 

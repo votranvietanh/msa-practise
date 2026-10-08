@@ -42,7 +42,7 @@ class OrderQueryServiceCacheTest {
     static class TestConfig {
         @Bean
         ConcurrentMapCacheManager cacheManager() {
-            return new ConcurrentMapCacheManager("orderStatus");
+            return new ConcurrentMapCacheManager("orderStatus", "orderOwner");
         }
 
         @Bean
@@ -85,6 +85,24 @@ class OrderQueryServiceCacheTest {
         orderQueryService.getStatus("ORD-2");             // phải cache miss lại -> gọi repository lần nữa
 
         verify(orderRepository, times(2)).findById("ORD-2");
+    }
+
+    @Test
+    void getOwnerId_traVeChuDon_vaDuocCache() {
+        Order order = new Order("ORD-3", "U001", 250_000L, List.of(), OrderStatus.PENDING);
+        when(orderRepository.findById("ORD-3")).thenReturn(Optional.of(order));
+
+        assertThat(orderQueryService.getOwnerId("ORD-3")).isEqualTo("U001");
+        assertThat(orderQueryService.getOwnerId("ORD-3")).isEqualTo("U001");
+
+        verify(orderRepository, times(1)).findById("ORD-3");
+    }
+
+    @Test
+    void getOwnerId_orderKhongTonTai_traVeNull() {
+        when(orderRepository.findById("ORD-MA")).thenReturn(Optional.empty());
+
+        assertThat(orderQueryService.getOwnerId("ORD-MA")).isNull();
     }
 
     @Test

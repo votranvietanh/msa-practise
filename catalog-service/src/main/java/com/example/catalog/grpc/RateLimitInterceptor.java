@@ -11,9 +11,11 @@ import java.time.Duration;
  * nếu vượt quá giới hạn - CatalogGrpcService không cần biết gì về rate limit, tách biệt rõ
  * "logic nghiệp vụ" khỏi "chính sách bảo vệ API" (Single Responsibility).
  *
- * Demo rate-limit theo TÊN METHOD (mọi client cùng chia sẻ 1 giới hạn) để đơn giản hoá -
- * hệ thống thật nên rate-limit theo API key/userId lấy từ Metadata (header gRPC), mỗi
- * client 1 giới hạn riêng.
+ * Hạn mức tính RIÊNG CHO TỪNG NGƯỜI GỌI (key = tên method + định danh người gọi lấy từ
+ * CallerContext do JwtAuthInterceptor ghi vào): 1 client spam không làm các client khác bị
+ * chặn lây. Điều này chỉ có nghĩa khi JwtAuthInterceptor chạy TRƯỚC interceptor này - nếu
+ * đảo thứ tự, mọi request đều thành "anonymous" và cả hệ thống lại dùng chung 1 hạn mức
+ * (xem InterceptorOrderTest + GrpcServerLifecycle).
  */
 @Component
 public class RateLimitInterceptor implements ServerInterceptor {
@@ -33,8 +35,10 @@ public class RateLimitInterceptor implements ServerInterceptor {
             ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
 
         String method = call.getMethodDescriptor().getFullMethodName();
+        String caller = CallerContext.CALLER_ID.get();
+        String limitKey = method + ":" + (caller != null ? caller : "anonymous");
 
-        if (LIMITED_METHOD.equals(method) && !rateLimiter.tryAcquire(method, LIMIT, WINDOW)) {
+        if (LIMITED_METHOD.equals(method) && !rateLimiter.tryAcquire(limitKey, LIMIT, WINDOW)) {
             // RESOURCE_EXHAUSTED: đúng status code chuẩn gRPC cho "vượt quota/rate limit"
             // (tương đương HTTP 429 Too Many Requests bên REST). call.close() kết thúc
             // RPC NGAY, không gọi tới CatalogGrpcService.createProduct() nữa.
